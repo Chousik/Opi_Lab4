@@ -1,0 +1,624 @@
+diff --git a/build.gradle b/build.gradle
+index d5fb977e..6a4c3649 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -20,19 +20,16 @@ repositories {
+ dependencies {
+     dependencies {
+         implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+-        implementation 'mysql:mysql-connector-java:8.0.29'
++        compileOnly 'org.projectlombok:lombok:1.18.20'
++        annotationProcessor 'org.projectlombok:lombok:1.18.20'
+         implementation 'org.springframework.boot:spring-boot-starter-web'
+         implementation 'org.springframework.boot:spring-boot-starter-logging'
+         implementation 'org.springframework.boot:spring-boot-starter-security'
+         implementation 'io.jsonwebtoken:jjwt-api:0.11.2'
+-
+-        // Зависимость для OpenSearch
+-        implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+-        implementation 'org.springframework.data:spring-data-elasticsearch:5.0.0'
++        runtimeOnly 'org.postgresql:postgresql'
+ 
+         runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.2'
+         runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.2'
+-        runtimeOnly 'mysql:mysql-connector-java'
+ 
+         testImplementation 'org.springframework.boot:spring-boot-starter-test'
+     }
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 68da0d10..e15e5ff5 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -1,22 +1,14 @@
+-version: "3"
+ services:
+-  opensearch:
+-    image: opensearchproject/opensearch:2.18.0
+-    container_name: opensearch
++  db:
++    image: postgres:latest
++    restart: always
++    expose:
++      - "5432"
+     environment:
+-      - discovery.type=single-node
+-      - plugins.security.ssl.http.enabled=false
+-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=P4-v6d=f205.21
++      POSTGRES_USER: postgres
++      POSTGRES_PASSWORD: postgres
++      POSTGRES_DB: task_app
+     ports:
+-      - "9200:9200"
+-      - "9600:9600"
+-    volumes:
+-      - opensearch-data:/usr/share/opensearch/data
+-    networks:
+-      - opensearch-net
++      - "5432:5432"
+ volumes:
+-  opensearch-data:
+-    driver: local
+-networks:
+-  opensearch-net:
+-    driver: bridge
++  db:
+\ No newline at end of file
+diff --git a/src/main/java/org/example/web4/components/JwtFilter.java b/src/main/java/org/example/web4/components/JwtFilter.java
+index c6958120..8582c5d6 100644
+--- a/src/main/java/org/example/web4/components/JwtFilter.java
++++ b/src/main/java/org/example/web4/components/JwtFilter.java
+@@ -6,6 +6,9 @@ import jakarta.servlet.FilterChain;
+ import jakarta.servlet.ServletException;
+ import jakarta.servlet.http.HttpServletRequest;
+ import jakarta.servlet.http.HttpServletResponse;
++import lombok.AccessLevel;
++import lombok.RequiredArgsConstructor;
++import lombok.experimental.FieldDefaults;
+ import org.example.web4.services.AuthenticationService;
+ import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.http.HttpStatus;
+@@ -17,11 +20,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
+ import java.io.IOException;
+ import java.util.ArrayList;
+ 
+-@Component
++@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
++@RequiredArgsConstructor
+ public class JwtFilter extends OncePerRequestFilter {
+-
+-    @Autowired
+-    private AuthenticationService authenticationService;
++    AuthenticationService authenticationService;
+ 
+     @Override
+     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+diff --git a/src/main/java/org/example/web4/configs/OpenSearchConfig.java b/src/main/java/org/example/web4/configs/OpenSearchConfig.java
+deleted file mode 100644
+index 84685d5b..00000000
+--- a/src/main/java/org/example/web4/configs/OpenSearchConfig.java
++++ /dev/null
+@@ -1,30 +0,0 @@
+-package org.example.web4.services;
+-
+-import org.elasticsearch.client.Request;
+-import org.elasticsearch.client.Response;
+-import org.elasticsearch.client.RestClient;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.stereotype.Service;
+-
+-import java.io.IOException;
+-
+-@Service
+-public class OpenSearchConfig {
+-
+-    private RestClient restClient;
+-
+-    @Autowired
+-    public void ElasticsearchService(RestClient restClient) {
+-        this.restClient = restClient;
+-    }
+-
+-    public OpenSearchConfig(RestClient restClient) {
+-        this.restClient = restClient;
+-    }
+-
+-    public void search() throws IOException {
+-        Request request = new Request("GET", "/_search");
+-        Response response = restClient.performRequest(request);
+-        System.out.println(response.getEntity());
+-    }
+-}
+diff --git a/src/main/java/org/example/web4/configs/SecurityConfig.java b/src/main/java/org/example/web4/configs/SecurityConfig.java
+index a736e269..7b4acea5 100644
+--- a/src/main/java/org/example/web4/configs/SecurityConfig.java
++++ b/src/main/java/org/example/web4/configs/SecurityConfig.java
+@@ -1,6 +1,10 @@
+ package org.example.web4.configs;
+ 
++import lombok.AccessLevel;
++import lombok.RequiredArgsConstructor;
++import lombok.experimental.FieldDefaults;
+ import org.example.web4.components.JwtFilter;
++import org.example.web4.services.AuthenticationService;
+ import org.springframework.context.annotation.Bean;
+ import org.springframework.context.annotation.Configuration;
+ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+@@ -8,23 +12,19 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ import org.springframework.security.web.SecurityFilterChain;
+ import org.springframework.web.cors.CorsConfiguration;
+-import org.springframework.beans.factory.annotation.Autowired;
+ 
+ import java.util.List;
+ 
+ @Configuration
+ public class SecurityConfig {
+ 
+-    @Autowired
+-    private JwtFilter jwtFilter;
+-
+     @Bean
+     public BCryptPasswordEncoder passwordEncoder() {
+         return new BCryptPasswordEncoder();
+     }
+ 
+     @Bean
+-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
++    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
+         http
+                 .csrf(AbstractHttpConfigurer::disable)
+                 .cors(cors -> cors.configurationSource(request -> {
+@@ -43,4 +43,8 @@ public class SecurityConfig {
+ 
+         return http.build();
+     }
++    @Bean
++    public JwtFilter jwtFilter(AuthenticationService authenticationService) {
++        return new JwtFilter(authenticationService);
++    }
+ }
+diff --git a/src/main/java/org/example/web4/controllers/LoginController.java b/src/main/java/org/example/web4/controllers/LoginController.java
+index a7fb3e9c..c59acf7e 100644
+--- a/src/main/java/org/example/web4/controllers/LoginController.java
++++ b/src/main/java/org/example/web4/controllers/LoginController.java
+@@ -1,5 +1,8 @@
+ package org.example.web4.controllers;
+ 
++import lombok.AccessLevel;
++import lombok.RequiredArgsConstructor;
++import lombok.experimental.FieldDefaults;
+ import org.example.web4.services.AuthenticationService;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+@@ -11,13 +14,10 @@ import org.springframework.web.bind.annotation.*;
+ 
+ @RestController
+ @RequestMapping("/auth")
++@RequiredArgsConstructor
++@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+ public class LoginController {
+-
+-    private final AuthenticationService authenticationService;
+-
+-    public LoginController(AuthenticationService authenticationService) {
+-        this.authenticationService = authenticationService;
+-    }
++    AuthenticationService authenticationService;
+ 
+     @PostMapping("/login")
+     public ResponseEntity<String> login(@RequestParam String username, @RequestParam String password) {
+@@ -28,4 +28,9 @@ public class LoginController {
+             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+         }
+     }
++    @PostMapping("/register")
++    public ResponseEntity<String> register(@RequestParam String username, @RequestParam String password) {
++        authenticationService.register(username, password);
++        return ResponseEntity.ok().build();
++    }
+ }
+\ No newline at end of file
+diff --git a/src/main/java/org/example/web4/controllers/SessionController.java b/src/main/java/org/example/web4/controllers/SessionController.java
+index 0a1abe48..ca7b4dc6 100644
+--- a/src/main/java/org/example/web4/controllers/SessionController.java
++++ b/src/main/java/org/example/web4/controllers/SessionController.java
+@@ -1,9 +1,11 @@
+ package org.example.web4.controllers;
+ 
+-import org.example.web4.dataBase.models.Point;
++import lombok.AccessLevel;
++import lombok.RequiredArgsConstructor;
++import lombok.experimental.FieldDefaults;
++import org.example.web4.dataBase.models.Points;
+ import org.example.web4.services.SessionService;
+ import org.example.web4.utill.AreaCheck;
+-import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.security.core.context.SecurityContextHolder;
+ import org.springframework.web.bind.annotation.*;
+@@ -12,28 +14,29 @@ import java.util.List;
+ 
+ @RestController
+ @RequestMapping("/api")
++@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
++@RequiredArgsConstructor
+ public class SessionController {
+-    @Autowired
+-    private SessionService sessionService;
++    SessionService sessionService;
+ 
+     @PostMapping("/add")
+-    public Point addPoint(@RequestParam float x, @RequestParam float y, @RequestParam float r) {
++    public Points addPoint(@RequestParam float x, @RequestParam float y, @RequestParam float r) {
+         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+         String username = authentication != null ? authentication.getName() : null;
+         if (Validation.validate(x, y, r)){
+-            Point point = new Point();
+-            point.setUserId(username);
+-            point.setX(x);
+-            point.setY(y);
+-            point.setR(r);
+-            point.setIshit(AreaCheck.isInArea(x, y, r));
+-            return sessionService.addPoint(point);
++            Points points = new Points();
++            points.setUserId(username);
++            points.setX(x);
++            points.setY(y);
++            points.setR(r);
++            points.setIshit(AreaCheck.isInArea(x, y, r));
++            return sessionService.addPoint(points);
+         }
+         throw new RuntimeException("Вы обманули фронт");
+     }
+ 
+     @GetMapping("/user")
+-    public List<Point> getPointsByUser() {
++    public List<Points> getPointsByUser() {
+         return sessionService.getUserPoints();
+     }
+ }
+diff --git a/src/main/java/org/example/web4/dataBase/PointRepository.java b/src/main/java/org/example/web4/dataBase/PointRepository.java
+index 3d6a81e4..bbe92543 100644
+--- a/src/main/java/org/example/web4/dataBase/PointRepository.java
++++ b/src/main/java/org/example/web4/dataBase/PointRepository.java
+@@ -1,12 +1,13 @@
+ package org.example.web4.dataBase;
+ 
+-import org.example.web4.dataBase.models.Point;
+-import org.springframework.data.elasticsearch.repository.ElasticsearchRepository;
++import org.example.web4.dataBase.models.Points;
++import org.springframework.data.jpa.repository.JpaRepository;
+ import org.springframework.stereotype.Repository;
+ 
+ import java.util.List;
++import java.util.UUID;
+ 
+ @Repository
+-public interface PointRepository extends ElasticsearchRepository<Point, String> {
+-    List<Point> findByUserId(String userId);
++public interface PointRepository extends JpaRepository<Points, UUID> {
++    List<Points> findByUserId(String userId);
+ }
+diff --git a/src/main/java/org/example/web4/dataBase/UserRepository.java b/src/main/java/org/example/web4/dataBase/UserRepository.java
+index 220c9a78..c05e91a3 100644
+--- a/src/main/java/org/example/web4/dataBase/UserRepository.java
++++ b/src/main/java/org/example/web4/dataBase/UserRepository.java
+@@ -2,9 +2,12 @@ package org.example.web4.dataBase;
+ 
+ import org.example.web4.dataBase.models.User;
+ import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.stereotype.Repository;
+ 
+ import java.util.Optional;
++import java.util.UUID;
+ 
+-public interface UserRepository extends JpaRepository<User, Long> {
++@Repository
++public interface UserRepository extends JpaRepository<User, UUID> {
+     Optional<User> findByUsername(String username);
+ }
+diff --git a/src/main/java/org/example/web4/dataBase/models/Point.java b/src/main/java/org/example/web4/dataBase/models/Point.java
+deleted file mode 100644
+index e03c38b6..00000000
+--- a/src/main/java/org/example/web4/dataBase/models/Point.java
++++ /dev/null
+@@ -1,54 +0,0 @@
+-package org.example.web4.dataBase.models;
+-
+-import org.springframework.data.annotation.Id;
+-import org.springframework.data.elasticsearch.annotations.Document;
+-
+-@Document(indexName = "user_points")
+-public class Point {
+-
+-    private String userId;
+-    private float x;
+-    private float y;
+-    private float r;
+-    private boolean ishit;
+-
+-    public String getUserId() {
+-        return userId;
+-    }
+-
+-    public void setUserId(String userId) {
+-        this.userId = userId;
+-    }
+-
+-    public float getX() {
+-        return x;
+-    }
+-
+-    public void setX(float x) {
+-        this.x = x;
+-    }
+-
+-    public float getY() {
+-        return y;
+-    }
+-
+-    public void setY(float y) {
+-        this.y = y;
+-    }
+-
+-    public float getR() {
+-        return r;
+-    }
+-
+-    public void setR(float r) {
+-        this.r = r;
+-    }
+-
+-    public boolean isIshit() {
+-        return ishit;
+-    }
+-
+-    public void setIshit(boolean ishit) {
+-        this.ishit = ishit;
+-    }
+-}
+diff --git a/src/main/java/org/example/web4/dataBase/models/Points.java b/src/main/java/org/example/web4/dataBase/models/Points.java
+new file mode 100644
+index 00000000..dbb50480
+--- /dev/null
++++ b/src/main/java/org/example/web4/dataBase/models/Points.java
+@@ -0,0 +1,25 @@
++package org.example.web4.dataBase.models;
++
++import jakarta.persistence.*;
++import lombok.AccessLevel;
++import lombok.Getter;
++import lombok.Setter;
++import lombok.experimental.FieldDefaults;
++
++import java.util.UUID;
++
++@Entity
++@Table(name = "points")
++@FieldDefaults(level = AccessLevel.PRIVATE)
++@Setter
++@Getter
++public class Points {
++    @GeneratedValue(strategy = GenerationType.UUID)
++    @Id
++    UUID id;
++    String userId;
++    float x;
++    float y;
++    float r;
++    boolean ishit;
++}
+diff --git a/src/main/java/org/example/web4/dataBase/models/User.java b/src/main/java/org/example/web4/dataBase/models/User.java
+index 9bc69761..9190db13 100644
+--- a/src/main/java/org/example/web4/dataBase/models/User.java
++++ b/src/main/java/org/example/web4/dataBase/models/User.java
+@@ -1,41 +1,24 @@
+ package org.example.web4.dataBase.models;
+ 
+ import jakarta.persistence.*;
++import lombok.AccessLevel;
++import lombok.Getter;
++import lombok.Setter;
++import lombok.experimental.FieldDefaults;
++
++import java.util.UUID;
+ 
+ @Entity
++@Getter
++@Setter
++@FieldDefaults(level = AccessLevel.PRIVATE)
+ @Table(name = "users")
+ public class User {
+ 
+     @Id
+-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+-    private Long id;
+-
+-    private String username;
+-
++    @GeneratedValue(strategy = GenerationType.UUID)
++    UUID id;
++    String username;
+     @Column(name = "password_hash")
+-    private String passwordHash;
+-
+-    public Long getId() {
+-        return id;
+-    }
+-
+-    public void setId(Long id) {
+-        this.id = id;
+-    }
+-
+-    public String getUsername() {
+-        return username;
+-    }
+-
+-    public void setUsername(String username) {
+-        this.username = username;
+-    }
+-
+-    public String getPasswordHash() {
+-        return passwordHash;
+-    }
+-
+-    public void setPasswordHash(String passwordHash) {
+-        this.passwordHash = passwordHash;
+-    }
++    String passwordHash;
+ }
+diff --git a/src/main/java/org/example/web4/services/AuthenticationService.java b/src/main/java/org/example/web4/services/AuthenticationService.java
+index ae1d170a..d9a1ce52 100644
+--- a/src/main/java/org/example/web4/services/AuthenticationService.java
++++ b/src/main/java/org/example/web4/services/AuthenticationService.java
+@@ -2,8 +2,10 @@ package org.example.web4.services;
+ 
+ import io.jsonwebtoken.SignatureAlgorithm;
+ import io.jsonwebtoken.security.Keys;
++import lombok.AccessLevel;
++import lombok.RequiredArgsConstructor;
++import lombok.experimental.FieldDefaults;
+ import org.example.web4.dataBase.UserRepository;
+-import org.springframework.beans.factory.annotation.Autowired;
+ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+ import org.springframework.stereotype.Service;
+ 
+@@ -15,16 +17,11 @@ import org.example.web4.dataBase.models.User;
+ import javax.crypto.SecretKey;
+ 
+ @Service
++@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
++@RequiredArgsConstructor
+ public class AuthenticationService {
+-
+-    @Autowired
+-    private UserRepository userRepository;
+-
+-    private BCryptPasswordEncoder passwordEncoder;
+-
+-    public AuthenticationService() {
+-        this.passwordEncoder = new BCryptPasswordEncoder();
+-    }
++    UserRepository userRepository;
++    BCryptPasswordEncoder passwordEncoder;
+ 
+     public boolean authenticate(String username, String password) {
+         Optional<User> userOptional = userRepository.findByUsername(username);
+@@ -35,16 +32,16 @@ public class AuthenticationService {
+         return false;
+     }
+ 
+-//    public void register(String username, String password) {
+-//        if (userRepository.findByUsername(username).isPresent()) {
+-//            throw new IllegalArgumentException("User already exists");
+-//        }
+-//        String passwordHash = passwordEncoder.encode(password);
+-//        User user = new User();
+-//        user.setUsername(username);
+-//        user.setPasswordHash(passwordHash);
+-//        userRepository.save(user);
+-//    }
++    public void register(String username, String password) {
++        if (userRepository.findByUsername(username).isPresent()) {
++            throw new IllegalArgumentException("User already exists");
++        }
++        String passwordHash = passwordEncoder.encode(password);
++        User user = new User();
++        user.setUsername(username);
++        user.setPasswordHash(passwordHash);
++        userRepository.save(user);
++    }
+ 
+     public String generateToken(String username) {
+         SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+diff --git a/src/main/java/org/example/web4/services/SessionService.java b/src/main/java/org/example/web4/services/SessionService.java
+index 747f89e3..cad9cbce 100644
+--- a/src/main/java/org/example/web4/services/SessionService.java
++++ b/src/main/java/org/example/web4/services/SessionService.java
+@@ -1,9 +1,10 @@
+ package org.example.web4.services;
+ 
++import lombok.AccessLevel;
++import lombok.RequiredArgsConstructor;
++import org.example.web4.dataBase.models.Points;
++import lombok.experimental.FieldDefaults;
+ import org.example.web4.dataBase.PointRepository;
+-import org.example.web4.dataBase.models.Point;
+-import org.springframework.beans.factory.annotation.Autowired;
+-import org.springframework.data.elasticsearch.client.erhlc.ElasticsearchRestTemplate;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.security.core.context.SecurityContextHolder;
+ import org.springframework.stereotype.Service;
+@@ -11,22 +12,16 @@ import org.springframework.stereotype.Service;
+ import java.util.List;
+ 
+ @Service
++@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
++@RequiredArgsConstructor
+ public class SessionService {
++    PointRepository pointRepository;
+ 
+-    private final PointRepository pointRepository;
+-    private final ElasticsearchRestTemplate elasticsearchRestTemplate;
+-
+-    @Autowired
+-    public SessionService(PointRepository pointRepository, ElasticsearchRestTemplate elasticsearchRestTemplate) {
+-        this.pointRepository = pointRepository;
+-        this.elasticsearchRestTemplate = elasticsearchRestTemplate;
+-    }
+-
+-    public Point addPoint(Point point) {
+-        return pointRepository.save(point);
++    public Points addPoint(Points points) {
++        return pointRepository.save(points);
+     }
+ 
+-    public List<Point> getUserPoints() {
++    public List<Points> getUserPoints() {
+         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+         String username = authentication != null ? authentication.getName() : null;
+         if (username != null) {
+diff --git a/src/main/resources/application.properties b/src/main/resources/application.properties
+deleted file mode 100644
+index c523c4c4..00000000
+--- a/src/main/resources/application.properties
++++ /dev/null
+@@ -1,17 +0,0 @@
+-spring.application.name=web4
+-
+-spring.datasource.url=jdbc:mysql://localhost:3306/lab4?useSSL=false&serverTimezone=UTC
+-spring.datasource.username=root
+-spring.datasource.password=lab4passwd
+-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+-
+-spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect
+-spring.jpa.hibernate.ddl-auto=update
+-spring.jpa.show-sql=true
+-spring.jpa.properties.hibernate.format_sql=true
+-
+-spring.data.elasticsearch.rest.uris=http://localhost:9200
+-spring.data.elasticsearch.index-prefix=user_points
+-
+-logging.level.org.hibernate.SQL=DEBUG
+-logging.level.org.hibernate.type.descriptor.sql=trace
+diff --git a/src/main/resources/application.yaml b/src/main/resources/application.yaml
+new file mode 100644
+index 00000000..504eac8a
+--- /dev/null
++++ b/src/main/resources/application.yaml
+@@ -0,0 +1,14 @@
++spring:
++  application:
++    name: web4
++  datasource:
++    driver-class-name: org.postgresql.Driver
++    username: postgres
++    password: postgres
++    url: jdbc:postgresql://localhost:5432/task_app
++  jpa:
++    hibernate:
++      ddl-auto: update
++    open-in-view: false
++server:
++  port: 8080
+\ No newline at end of file

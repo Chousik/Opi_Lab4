@@ -50,45 +50,50 @@ task music(type: Exec) {
 
 task history {
     doLast {
-        def commits = "git rev-list --reverse HEAD".execute().text.readLines()
+        def commits = "git rev-list --reverse HEAD".execute().text.readLines() // от старого к новому
         def lastWorking = null
+        def brokenAfter = null
 
-        println "🔁 Начинаем проверку ${commits.size()} коммитов..."
+        println "🔍 Проверяем коммиты от самого старого к самому новому: ${commits.size()} шт."
 
-        for (commit in commits) {
-            println "⏳ Проверка коммита $commit"
+        for (int i = commits.size() - 1; i >= 0; i--) {
+            def commit = commits[i]
+            println "\n⏳ Проверка коммита $commit"
             "git checkout $commit".execute().waitForProcessOutput(System.out, System.err)
 
             def result = "./gradlew clean compileJava".execute()
             result.waitFor()
 
             if (result.exitValue() == 0) {
-                println "✅ Сборка успешна на коммите: $commit"
+                println "✅ Успешная сборка на $commit"
                 lastWorking = commit
+                if (i + 1 < commits.size()) {
+                    brokenAfter = commits[i + 1]
+                }
                 break
             } else {
-                println "❌ Сборка провалилась на $commit"
+                println "❌ Сборка не удалась на $commit"
             }
         }
 
         if (lastWorking == null) {
-            println "🚨 Ни один коммит не собирается!"
+            println "🚨 Ни один коммит не компилируется!"
             return
         }
 
-        def index = commits.indexOf(lastWorking)
-        if (index + 1 >= commits.size()) {
-            println "ℹ️ Рабочий коммит — самый последний, diff не нужен."
+        if (brokenAfter == null) {
+            println "⚠️ Следующий (сломанный) коммит не найден — возможно, $lastWorking это HEAD."
             return
         }
 
-        def nextCommit = commits[index + 1]
-        def diff = "git diff $lastWorking $nextCommit".execute().text
+        println "\n📄 Создаём diff между:"
+        println "   🟢 Рабочим:    $lastWorking"
+        println "   🔴 Сломанным:  $brokenAfter"
+
+        def diff = "git diff $lastWorking $brokenAfter".execute().text
         def diffPath = "diff_between_commits.txt"
 
         Files.write(Paths.get(diffPath), diff.getBytes())
-        println "📄 Diff сохранён в $diffPath"
-        println "🟢 Рабочий: $lastWorking"
-        println "🔴 Сломанный: $nextCommit"
+        println "💾 Diff сохранён в $diffPath"
     }
 }
