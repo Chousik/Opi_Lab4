@@ -1,3 +1,5 @@
+import java.nio.file.Files
+import java.nio.file.Paths
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.0'
@@ -47,27 +49,46 @@ task music(type: Exec) {
 }
 
 task history {
-    dependsOn compileJava
     doLast {
-        def revision = 'HEAD'
-        def success = false
+        def commits = "git rev-list --reverse HEAD".execute().text.readLines()
+        def lastWorking = null
 
-        while (!success && revision != '') {
-            def result = exec {
-                commandLine 'git', 'checkout', revision
-                ignoreExitValue true
-            }
-            success = result.exitValue == 0
-            if (!success) {
-                revision = "${revision}~1"
+        println "🔁 Начинаем проверку ${commits.size()} коммитов..."
+
+        for (commit in commits) {
+            println "⏳ Проверка коммита $commit"
+            "git checkout $commit".execute().waitForProcessOutput(System.out, System.err)
+
+            def result = "./gradlew clean compileJava".execute()
+            result.waitFor()
+
+            if (result.exitValue() == 0) {
+                println "✅ Сборка успешна на коммите: $commit"
+                lastWorking = commit
+                break
+            } else {
+                println "❌ Сборка провалилась на $commit"
             }
         }
 
-        if (success) {
-            exec {
-                commandLine 'git', 'diff', "${revision}~1", revision
-                standardOutput = new FileOutputStream("diff_output.txt")
-            }
+        if (lastWorking == null) {
+            println "🚨 Ни один коммит не собирается!"
+            return
         }
+
+        def index = commits.indexOf(lastWorking)
+        if (index + 1 >= commits.size()) {
+            println "ℹ️ Рабочий коммит — самый последний, diff не нужен."
+            return
+        }
+
+        def nextCommit = commits[index + 1]
+        def diff = "git diff $lastWorking $nextCommit".execute().text
+        def diffPath = "diff_between_commits.txt"
+
+        Files.write(Paths.get(diffPath), diff.getBytes())
+        println "📄 Diff сохранён в $diffPath"
+        println "🟢 Рабочий: $lastWorking"
+        println "🔴 Сломанный: $nextCommit"
     }
 }
