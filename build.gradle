@@ -41,3 +41,33 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+task music(type: Exec) {
+    dependsOn build
+    commandLine 'bash', '-c', 'afplay music.mp3'
+}
+
+task history {
+    dependsOn compileJava
+    doLast {
+        def revision = 'HEAD'
+        def success = false
+
+        while (!success && revision != '') {
+            def result = exec {
+                commandLine 'git', 'checkout', revision
+                ignoreExitValue true
+            }
+            success = result.exitValue == 0
+            if (!success) {
+                revision = "${revision}~1"
+            }
+        }
+
+        if (success) {
+            exec {
+                commandLine 'git', 'diff', "${revision}~1", revision
+                standardOutput = new FileOutputStream("diff_output.txt")
+            }
+        }
+    }
+}

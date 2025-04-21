@@ -1,0 +1,12 @@
+diff --git a/build.gradle b/build.gradle
+index 6a4c364..f242c2a 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -18,6 +18,7 @@ repositories {
+ }
+ 
+ dependencies {
++    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+     dependencies {
+         implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+         compileOnly 'org.projectlombok:lombok:1.18.20'
