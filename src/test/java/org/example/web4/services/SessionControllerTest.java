@@ -46,7 +46,7 @@ public class SessionControllerTest {
 
     @Test()
     public void testAddPointInvalid() {
-        sessionController.addPoint(10, 10, 5);
+        Assertions.assertThrows(RuntimeException.class,() -> sessionController.addPoint(10, 10, 5));
     }
 
     @Test
