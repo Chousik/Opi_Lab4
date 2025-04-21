@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class LoginController {
     AuthenticationService authenticationService;
 
-    @PostMapping("/login"
+    @PostMapping("/login")
     public ResponseEntity<String> login(@RequestParam String username, @RequestParam String password) {
         if (authenticationService.authenticate(username, password)) {
             String token = authenticationService.generateToken(username);
