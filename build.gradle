@@ -54,46 +54,46 @@ task history {
         def lastWorking = null
         def brokenAfter = null
 
-        println "🔍 Проверяем коммиты от самого старого к самому новому: ${commits.size()} шт."
+        println "Проверяем коммиты от самого старого к самому новому: ${commits.size()} шт."
 
         for (int i = commits.size() - 1; i >= 0; i--) {
             def commit = commits[i]
-            println "\n⏳ Проверка коммита $commit"
+            println "Проверка коммита $commit"
             "git checkout $commit".execute().waitForProcessOutput(System.out, System.err)
 
             def result = "./gradlew clean compileJava".execute()
             result.waitFor()
 
             if (result.exitValue() == 0) {
-                println "✅ Успешная сборка на $commit"
+                println "Успешная сборка на $commit"
                 lastWorking = commit
                 if (i + 1 < commits.size()) {
                     brokenAfter = commits[i + 1]
                 }
                 break
             } else {
-                println "❌ Сборка не удалась на $commit"
+                println "Сборка не удалась на $commit"
             }
         }
 
         if (lastWorking == null) {
-            println "🚨 Ни один коммит не компилируется!"
+            println "Ни один коммит не компилируется!"
             return
         }
 
         if (brokenAfter == null) {
-            println "⚠️ Следующий (сломанный) коммит не найден — возможно, $lastWorking это HEAD."
+            println "Следующий (сломанный) коммит не найден — возможно, $lastWorking это HEAD."
             return
         }
 
-        println "\n📄 Создаём diff между:"
-        println "   🟢 Рабочим:    $lastWorking"
-        println "   🔴 Сломанным:  $brokenAfter"
+        println "Создаём diff между:"
+        println "🟢 Рабочим:    $lastWorking"
+        println "🔴 Сломанным:  $brokenAfter"
 
         def diff = "git diff $lastWorking $brokenAfter".execute().text
         def diffPath = "diff_between_commits.txt"
 
         Files.write(Paths.get(diffPath), diff.getBytes())
-        println "💾 Diff сохранён в $diffPath"
+        println "Diff сохранён в $diffPath"
     }
 }
