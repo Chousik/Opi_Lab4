@@ -34,6 +34,17 @@ public class AreaCalculator implements AreaCalculatorMBean, Serializable {
         }
         return Math.abs(area / 2.0);
     }
+
+    @Override
+    public synchronized int getPointCount() {
+        return points.size();
+    }
+
+    @Override
+    public synchronized void clearPoints() {
+        points.clear();
+    }
+
     private record Point(double x, double y) {
     }
 }
