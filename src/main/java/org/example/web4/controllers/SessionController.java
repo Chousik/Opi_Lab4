@@ -4,6 +4,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.example.web4.dataBase.models.Points;
+import org.example.web4.services.AreaCalculator;
+import org.example.web4.services.AttemptStats;
 import org.example.web4.services.SessionService;
 import org.example.web4.utill.AreaCheck;
 import org.springframework.security.core.Authentication;
@@ -18,6 +20,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SessionController {
     SessionService sessionService;
+    AttemptStats attemptStats;
+    AreaCalculator areaCalculator;
 
     @PostMapping("/add")
     public Points addPoint(@RequestParam float x, @RequestParam float y, @RequestParam float r) {
@@ -30,6 +34,8 @@ public class SessionController {
             points.setY(y);
             points.setR(r);
             points.setIshit(AreaCheck.isInArea(x, y, r));
+            attemptStats.recordAttempt(points.isIshit());
+            areaCalculator.addPoint(x, y);
             return sessionService.addPoint(points);
         }
         throw new RuntimeException("Вы обманули фронт");

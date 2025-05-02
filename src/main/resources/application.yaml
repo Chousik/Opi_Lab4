@@ -1,6 +1,9 @@
 spring:
   application:
     name: web4
+  jmx:
+    enabled: true
+    default-domain: org.example.web4
   datasource:
     driver-class-name: org.postgresql.Driver
     username: postgres
