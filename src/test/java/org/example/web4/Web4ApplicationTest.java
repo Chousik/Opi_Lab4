@@ -1,12 +1,11 @@
 package org.example.web4;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
+@SpringBootTest
 public class Web4ApplicationTest {
     @Test
     public void contextLoads() {
-        assertEquals(4, 4);
     }
 }

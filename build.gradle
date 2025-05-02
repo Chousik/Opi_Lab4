@@ -21,34 +21,32 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    dependencies {
-        implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-        compileOnly 'org.projectlombok:lombok:1.18.20'
-        annotationProcessor 'org.projectlombok:lombok:1.18.20'
-        implementation 'org.springframework.boot:spring-boot-starter-web'
-        implementation 'org.springframework.boot:spring-boot-starter-logging'
-        implementation 'org.springframework.boot:spring-boot-starter-security'
-        implementation 'io.jsonwebtoken:jjwt-api:0.11.2'
-        runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    compileOnly 'org.projectlombok:lombok:1.18.20'
+    annotationProcessor 'org.projectlombok:lombok:1.18.20'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.2'
+    runtimeOnly 'org.postgresql:postgresql'
 
-        runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.2'
-        runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.2'
-
-        testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    }
-
-
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.2'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
-tasks.named('test') {
+tasks.withType(Test).configureEach {
     useJUnitPlatform()
 }
-task music(type: Exec) {
+
+tasks.register('music', Exec) {
     dependsOn build
     commandLine 'bash', '-c', 'afplay music.mp3'
 }
 
-task history {
+tasks.register('history') {
     doLast {
         def commits = "git rev-list --reverse HEAD".execute().text.readLines() // от старого к новому
         def lastWorking = null
