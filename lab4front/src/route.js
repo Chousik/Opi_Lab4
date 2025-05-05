@@ -5,7 +5,7 @@ import MainPage from "@/components/mainPage.vue";
 
 const routes = [
     { path: '/', component: StartPage },
-    { path: '/main', component: MainPage, meta: { requiresAuth: true } }
+    { path: '/main', component: MainPage, meta: { requiresAuth: false } }
 ];
 
 const router = createRouter({

@@ -7,7 +7,11 @@ import org.springframework.stereotype.Component;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+
+import static java.lang.Math.atan2;
+import static java.lang.Math.hypot;
 
 @Component
 @ManagedResource(objectName = "org.example.web4.services:type=AreaCalculator", description = "Calculates polygon area based on added points")
@@ -27,6 +31,14 @@ public class AreaCalculator implements AreaCalculatorMBean, Serializable {
 
         double area = 0.0;
         int n = points.size();
+        double cx = points.stream().mapToDouble(Point::x).average().orElse(0);
+        double cy = points.stream().mapToDouble(Point::y).average().orElse(0);
+        points.sort(Comparator.<Point>comparingDouble(
+                        p -> atan2(p.y() - cy, p.x() - cx))
+                .reversed()
+                .thenComparingDouble(
+                        p -> hypot(p.x() - cx, p.y() - cy))
+        );
         for (int i = 0; i < n; i++) {
             Point p1 = points.get(i);
             Point p2 = points.get((i + 1) % n);

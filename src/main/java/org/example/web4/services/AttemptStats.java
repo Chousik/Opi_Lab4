@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Component
-@ManagedResource(objectName = "org.example.web4.services:type=HitRatio", description = "Tracks hit statistics and sends notifications on 3 consecutive misses")
+@ManagedResource(objectName = "org.example.web4.services:type=AttemptStats", description = "Tracks hit statistics and sends notifications on 3 consecutive misses")
 public class AttemptStats implements AttemptStatsMBean, NotificationBroadcaster, Serializable {
     AtomicInteger totalSupplied = new AtomicInteger();
     AtomicInteger totalIn = new AtomicInteger();

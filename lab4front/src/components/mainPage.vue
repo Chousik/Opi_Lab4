@@ -28,7 +28,7 @@ export default {
   },
   methods: {
     async handleSubmit(data) {
-      const response = await axios.post('http://localhost:8080/api/login', data);
+      const response = await axios.post('http://localhost:8080/api/add', data);
 
       console.log('Получены данные:', response);
     },

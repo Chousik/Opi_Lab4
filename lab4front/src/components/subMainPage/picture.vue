@@ -1,4 +1,4 @@
-<template>
+`<template>
   <div class="picture">
     <svg @click="handleClick" width="500" height="500">
       <rect class="figure"
